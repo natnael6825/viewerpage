@@ -4,17 +4,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>User Viewing Stream</title>
+  <title>Viewer</title>
 </head>
 <body>
   <h1>Viewing Stream for Order: <span id="orderId"></span></h1>
   <video id="remoteVideo" autoplay playsinline></video>
   <script>
-    const ws = new WebSocket('ws://localhost:8080');
-    let peerConnection;
-    const orderId = 'your-generated-order-id'; // Replace with the actual order ID
-
+    const urlParams = new URLSearchParams(window.location.search);
+    const orderId = urlParams.get('orderId') || 'default-order-id'; // Use 'default-order-id' as fallback
     document.getElementById('orderId').innerText = orderId;
+
+    const ws = new WebSocket('wss://video-server-jn3s.onrender.com'); // Connect to your signaling server
+    let peerConnection;
 
     // WebRTC configuration
     const config = {
