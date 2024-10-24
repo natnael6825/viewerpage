@@ -2,141 +2,173 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simple WebRTC Video Chat</title>
-    <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            background-color: black;
-        }
-        video {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-        #remoteVideo {
-            z-index: 2; /* Make the remote video appear on top */
-        }
-        #localVideo {
-            z-index: 1; /* Local video in the background */
-            opacity: 0.3; /* Make the local video slightly transparent */
-            pointer-events: none; /* Prevent interactions with local video */
-        }
-    </style>
+       
+    <meta charset="UTF-8">
+       
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Simple WebRTC Video Chat</title>
+        <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: black;
+        }
+
+        video {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        #remoteVideo {
+            z-index: 2;
+            /* Make the remote video appear on top */
+        }
+
+        #localVideo {
+            z-index: 1;
+            /* Local video in the background */
+            opacity: 0.3;
+            /* Make the local video slightly transparent */
+            pointer-events: none;
+            /* Prevent interactions with local video */
+        }
+
+        #loadingScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: black;
+            color: white;
+            font-size: 24px;
+            z-index: 3;
+            /* On top of everything */
+        }
+
+        #loadingScreen.hidden {
+            display: none;
+            /* Hide the loading screen */
+        }
+    </style>
 </head>
 
 <body>
 
-    <video id="localVideo" autoplay playsinline muted></video>
-    <video id="remoteVideo" autoplay playsinline></video>
+        <div id="loadingScreen">Connecting...</div>
+        <video id="localVideo" autoplay playsinline muted></video>
+        <video id="remoteVideo" autoplay playsinline></video>
 
-    <script>
-        const localVideo = document.getElementById('localVideo');
-        const remoteVideo = document.getElementById('remoteVideo');
+       
+    <script>
+        const localVideo = document.getElementById('localVideo');
+        const remoteVideo = document.getElementById('remoteVideo');
+        const loadingScreen = document.getElementById('loadingScreen');
 
-        let localStream;
-        let peerConnection;
-        let socket;
-        let orderId;
+        let localStream;
+        let peerConnection;
+        let socket;
+        let orderId;
 
-        const signalingServerURL = 'wss://video-server-jn3s.onrender.com'; // Your WebSocket server URL
+        const signalingServerURL = 'wss://video-server-jn3s.onrender.com'; // Your WebSocket server URL
 
-        // Function to extract the orderId from URL parameters
-        function getOrderIdFromURL() {
-            const urlParams = new URLSearchParams(window.location.search);
-            return urlParams.get('orderId');
-        }
+        // Function to extract the orderId from URL parameters
+        function getOrderIdFromURL() {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get('orderId');
+        }
 
-        // Automatically set the orderId from URL and start WebSocket connection
-        function initializeConnection() {
-            orderId = getOrderIdFromURL();
-            if (!orderId) {
-                alert('No Call ID found in URL. Please provide a valid Call ID.');
-                return;
-            }
+        // Automatically set the orderId from URL and start WebSocket connection
+        function initializeConnection() {
+            orderId = getOrderIdFromURL();
+            if (!orderId) {
+                alert('No Call ID found in URL. Please provide a valid Call ID.');
+                return;
+            }
 
-            // Initialize WebSocket connection for signaling
-            socket = new WebSocket(signalingServerURL);
+            // Initialize WebSocket connection for signaling
+            socket = new WebSocket(signalingServerURL);
 
-            socket.onopen = () => {
-                console.log('Connected to signaling server');
-                startCall(); // Automatically start the call when connected
-            };
+            socket.onopen = () => {
+                console.log('Connected to signaling server');
+                startCall(); // Automatically start the call when connected
+            };
 
-            socket.onmessage = async (message) => {
-                const data = JSON.parse(message.data);
+            socket.onmessage = async (message) => {
+                const data = JSON.parse(message.data);
 
-                // Only process messages for the same orderId
-                if (data.orderId !== orderId) return;
+                // Only process messages for the same orderId
+                if (data.orderId !== orderId) return;
 
-                if (data.type === 'offer') {
-                    // Set the received offer as the remote description
-                    await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+                if (data.type === 'offer') {
+                    // Set the received offer as the remote description
+                    await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
 
-                    // Create an answer and send it back through the signaling server
-                    const answer = await peerConnection.createAnswer();
-                    await peerConnection.setLocalDescription(answer);
-                    socket.send(JSON.stringify({ orderId, type: 'answer', answer }));
-                }
+                    // Create an answer and send it back through the signaling server
+                    const answer = await peerConnection.createAnswer();
+                    await peerConnection.setLocalDescription(answer);
+                    socket.send(JSON.stringify({ orderId, type: 'answer', answer }));
+                }
 
-                if (data.type === 'answer') {
-                    // Set the received answer as the remote description
-                    await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
-                }
+                if (data.type === 'answer') {
+                    // Set the received answer as the remote description
+                    await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+                }
 
-                if (data.type === 'candidate') {
-                    // Add received ICE candidate to the RTCPeerConnection
-                    await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
-                }
-            };
+                if (data.type === 'candidate') {
+                    // Add received ICE candidate to the RTCPeerConnection
+                    await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+                }
+            };
 
-            socket.onclose = () => {
-                console.log('Disconnected from signaling server');
-            };
-        }
+            socket.onclose = () => {
+                console.log('Disconnected from signaling server');
+            };
+        }
 
-        // Function to start the call and create an offer/answer for WebRTC
-        async function startCall() {
-            // Get local media (camera and microphone)
-            localStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
-            localVideo.srcObject = localStream;
+        // Function to start the call and create an offer/answer for WebRTC
+        async function startCall() {
+            // Get local media (camera and microphone)
+            localStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
+            localVideo.srcObject = localStream;
 
-            // Create the RTCPeerConnection
-            const config = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
-            peerConnection = new RTCPeerConnection(config);
+            // Create the RTCPeerConnection
+            const config = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+            peerConnection = new RTCPeerConnection(config);
 
-            // Add local stream tracks to the peer connection
-            //localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+            // Handle ICE candidates
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate) {
+                    socket.send(JSON.stringify({ orderId, type: 'candidate', candidate: event.candidate }));
+                }
+            };
 
-            // Handle ICE candidates
-            peerConnection.onicecandidate = (event) => {
-                if (event.candidate) {
-                    socket.send(JSON.stringify({ orderId, type: 'candidate', candidate: event.candidate }));
-                }
-            };
+            // Handle incoming remote stream
+            peerConnection.ontrack = (event) => {
+                remoteVideo.srcObject = event.streams[0];
+                // Hide the loading screen when the remote stream is received
+                loadingScreen.classList.add('hidden');
+            };
 
-            // Handle incoming remote stream
-            peerConnection.ontrack = (event) => {
-                remoteVideo.srcObject = event.streams[0];
-            };
+            // Create an offer if this client initiates the call
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
+            socket.send(JSON.stringify({ orderId, type: 'offer', offer }));
+        }
 
-            // Create an offer if this client initiates the call
-            const offer = await peerConnection.createOffer();
-            await peerConnection.setLocalDescription(offer);
-            socket.send(JSON.stringify({ orderId, type: 'offer', offer }));
-        }
+        // Initialize the WebRTC connection when the page loads
+        window.onload = initializeConnection;
 
-        // Initialize the WebRTC connection when the page loads
-        window.onload = initializeConnection;
-
-    </script>
+    </script>
 </body>
 
 </html>
